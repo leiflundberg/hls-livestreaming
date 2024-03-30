@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream Recorder</title>
+</head>
+<body>
+    <video id="videoElement" width="640" height="480" autoplay></video>
+    <button id="startRecording">Start Recording</button>
+    <script>
+        const videoElement = document.getElementById('videoElement');
+        const startRecordingButton = document.getElementById('startRecording');
+        let mediaRecorder;
+        let chunks = [];
+
+        startRecordingButton.addEventListener('click', async () => {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            videoElement.srcObject = stream;
+
+            const startRecording = () => {
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = function(event) {
+                    if (event.data.size > 0) {
+                        chunks.push(event.data);
+                        if (mediaRecorder.state === 'recording') {
+                            mediaRecorder.stop();
+                        }
+                    }
+                };
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(chunks, { type: chunks[0].type });
+                    sendChunk(blob);
+                    chunks = [];
+                    startRecording();
+                };
+                mediaRecorder.start(12000);
+            };
+
+            startRecording();
+            console.log('Streaming video chunks to server started')
+        });
+
+        async function sendChunk(chunk) {
+            const formData = new FormData();
+            let filename = Date.now() + '.webm';
+            formData.append('chunk', chunk, filename);
+            await fetch('http://0.0.0.0:8080/chunk', {
+                method: 'POST',
+                body: formData
+            }).then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                console.log('Chunk successfully sent with name: ' + filename)
+            }).catch(error => {
+                console.error('Fetch error:', error);
+            });
+        }
+    </script>
+</body>
+</html>
