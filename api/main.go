@@ -33,7 +33,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Println("Receiving file: ", handler.Filename)
 
-	filepath := path.Join("webm", handler.Filename)
+	filepath := path.Join("chunks", handler.Filename)
 
 	err = os.WriteFile(filepath, fileBytes, 0644)
 	if err != nil {
@@ -41,24 +41,14 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	outputDir := "hls/"
-	playlistName := "output.m3u8"
+	// outputDir := "hls/"
+	// playlistName := "output.m3u8"
 
 	fmt.Println("Running ffmpeg conversion...")
 
 	cmd := exec.Command("ffmpeg",
 		"-i", filepath,
-		"-c:v", "h264",
-		"-f", "hls",
-		"-crf", "30", // Adjust the CRF value for faster encoding (lower quality)
-		"-preset", "ultrafast", // Use a faster encoding preset
-		"-g", "48", // Set keyframe interval (lower values might increase quality but also increase file size)
-		"-sc_threshold", "0", // Disable scene detection to speed up encoding
-		"-f", "hls",
-		"-hls_time", "4", // Set segment duration (lower values decrease latency but increase the number of files)
-		"-hls_list_size", "0", // Do not limit the number of playlist entries
-		"-hls_segment_filename", outputDir+"output%03d.ts",
-		outputDir+playlistName,
+		"test.mp4",
 	)
 
 	err = cmd.Run()
@@ -74,7 +64,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // TODO: add errorhandling if exists etc...
-
 func getIndex(w http.ResponseWriter, r *http.Request) {
 	playlistPath := path.Join("hls", "output.m3u8")
 	fmt.Println("Index file endpoint hit, serving: ", playlistPath)
@@ -90,6 +79,17 @@ func getSegment(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	dir := "chunks"
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		err := os.Mkdir(dir, 0755)
+		if err != nil {
+			fmt.Println("Error creating directory:", err)
+			return
+		}
+		fmt.Println("Directory created successfully.")
+	} else {
+		fmt.Println("Directory already exists.")
+	}
 	router := mux.NewRouter()
 	router.Use(corsMiddleware)
 	router.HandleFunc("/chunk", uploadHandler).Methods("POST")

@@ -12,33 +12,29 @@
         const videoElement = document.getElementById('videoElement');
         const startRecordingButton = document.getElementById('startRecording');
         let mediaRecorder;
-        let chunks = [];
+        let fileHeaders;
 
         startRecordingButton.addEventListener('click', async () => {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
             videoElement.srcObject = stream;
-
-            const startRecording = () => {
+            function startRecording() {
                 mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start()
+                console.log('Recording started')
                 mediaRecorder.ondataavailable = function(event) {
                     if (event.data.size > 0) {
-                        chunks.push(event.data);
-                        if (mediaRecorder.state === 'recording') {
-                            mediaRecorder.stop();
-                        }
+                        sendChunk(event.data);
                     }
                 };
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(chunks, { type: chunks[0].type });
-                    sendChunk(blob);
-                    chunks = [];
-                    startRecording();
-                };
-                mediaRecorder.start(12000);
-            };
-
+                setTimeout(restartRecording, 12000);
+            }
             startRecording();
-            console.log('Streaming video chunks to server started')
+
+            function restartRecording() {
+                mediaRecorder.stop();
+                console.log('Recording stopped')
+                startRecording();
+            }
         });
 
         async function sendChunk(chunk) {
